@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SynCode | Collaborative IDE</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>SynCode</h1>
+            <div class="room-controls">
+                <input type="text" id="roomId" placeholder="ID de la sala (ej: 101)">
+                <button onclick="connectToRoom()">Unirse a Sala</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="editor-container">
+                <textarea id="editor" placeholder="Escribe tu código aquí..."></textarea>
+            </section>
+
+            <section class="chat-container">
+                <div id="chat-messages"></div>
+                <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
