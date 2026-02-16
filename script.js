@@ -8,7 +8,7 @@ function connectToRoom() {
     if (!roomId) return alert("Introduce un ID de sala");
 
     // Cambia TU_IP_AZURE por la IP pública de tu máquina
-    const serverUrl = `ws://localhost:3000/room/${roomId}`;
+    const serverUrl = `ws://4.232.137.224:3000/room/${roomId}`;
     socket = new WebSocket(serverUrl);
 
     socket.onopen = () => {
