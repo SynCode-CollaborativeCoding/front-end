@@ -6,25 +6,67 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>SynCode</h1>
-            <div class="room-controls">
-                <input type="text" id="roomId" placeholder="ID de la sala (ej: 101)">
-                <button onclick="connectToRoom()">Unirse a Sala</button>
+    <div id="login-screen" class="full-view">
+        <div class="login-box">
+            <h2 id="auth-title">Join SynCode Room</h2>
+            <p class="login-label">Select your avatar:</p>
+            <div id="avatar-grid"></div>
+
+            <div class="input-group">
+                <input type="text" id="username-input" placeholder="Username" autocomplete="off">
+                <input type="password" id="password-input" placeholder="Password">
+                <input type="text" id="room-input" placeholder="Room Name" autocomplete="off">
             </div>
-        </header>
+            
+            <button id="btn-connect">Connect & Sync</button>
+            
+            <div class="auth-switch">
+                <p id="switch-text">Don't have an account? <a href="#" id="link-switch">Sign Up</a></p>
+            </div>
+        </div>
+    </div>
 
-        <main>
-            <section class="editor-container">
-                <textarea id="editor" placeholder="Escribe tu código aquí..."></textarea>
-            </section>
+    <div id="chat-app" class="full-view">
+        <div class="grid-container" id="main-layout">
+            
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h3>Users</h3>
+                    <button class="toggle-btn" onclick="toggleSidebar()">◀</button>
+                </div>
+                <ul id="users-list"></ul>
+            </aside>
 
-            <section class="chat-container">
-                <div id="chat-messages"></div>
-                <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
-            </section>
-        </main>
+            <main class="main-content">
+                <header class="chat-header">
+                    <div class="header-left">
+                        <button class="toggle-btn show-sidebar-btn" id="btn-show-sidebar" onclick="toggleSidebar()">▶</button>
+                        <span id="room-display">Room: </span>
+                    </div>
+                    <span id="target-display">Talking to: Everyone</span>
+                    <button class="toggle-btn" id="btn-toggle-chat" onclick="toggleChat()">💬 Chat ▼</button>
+                </header>
+                
+                <div class="editor-wrapper">
+                    <textarea id="editor" spellcheck="false" placeholder="// Start coding together..."></textarea>
+                </div>
+
+                <div id="chat-collapsible">
+                    <div id="messages-log"></div>
+                    <div class="input-zone">
+                        <div id="emoji-bar">
+                            <button class="emoji-btn">😂</button><button class="emoji-btn">😎</button>
+                            <button class="emoji-btn">🔥</button><button class="emoji-btn">💡</button>
+                            <button class="emoji-btn">👍</button>
+                        </div>
+                        <div class="input-row">
+                            <input type="text" id="msg-input" placeholder="Type here...">
+                            <button id="btn-send">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
