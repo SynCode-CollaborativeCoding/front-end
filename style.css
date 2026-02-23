@@ -256,6 +256,10 @@ body {
     font-size: 12px;
 }
 
+#btn-toggle-chat {
+    font-size: 20px;
+}
+
 .show-sidebar-btn {
     display: none;
 }
