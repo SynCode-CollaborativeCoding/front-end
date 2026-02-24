@@ -8,6 +8,8 @@ let targetId = null;
 let isSignUp = false;
 let chatHistory = [];
 let dbUsers = {}; // Almacena {id: {username, avatar}}
+let authToken = null; // JWT
+const HOST = "localhost:3000";
 
 // --- ELEMENTOS DEL DOM ---
 const editor = document.getElementById('editor');
@@ -32,6 +34,7 @@ for (let i = 1; i <= 8; i++) {
     };
     avatarGrid.appendChild(img);
 }
+avatarGrid.style.display = "none";
 
 // --- 2. LÓGICA DE AUTENTICACIÓN (LOGIN / SIGN UP) ---
 linkSwitch.onclick = (e) => {
@@ -40,95 +43,117 @@ linkSwitch.onclick = (e) => {
     
     const title = document.getElementById("auth-title");
     const switchText = document.getElementById("switch-text");
+    const roomInput = document.getElementById("room-input");
 
     if (isSignUp) {
         title.innerText = "Create Account";
         btnConnect.innerText = "Register & Join";
         switchText.innerHTML = 'Already have an account? <a href="#" id="link-switch">Log In</a>';
+        avatarGrid.style.display = "grid";
+        roomInput.style.display = "none";
     } else {
         title.innerText = "Join SynCode Room";
         btnConnect.innerText = "Connect & Sync";
         switchText.innerHTML = 'Don\'t have an account? <a href="#" id="link-switch">Sign Up</a>';
+        avatarGrid.style.display = "none";
+        roomInput.style.display = "block";
     }
     document.getElementById("link-switch").onclick = linkSwitch.onclick;
 };
 
-// --- 3. CONEXIÓN WEBSOCKET ---
-btnConnect.onclick = () => {
-    myUsername = document.getElementById("username-input").value;
-    room = document.getElementById("room-input").value;
-    const password = document.getElementById("password-input").value;
+btnConnect.onclick = async () => {
+    const usernameInput = document.getElementById("username-input").value;
+    const passwordInput = document.getElementById("password-input").value;
+    const roomInput = document.getElementById("room-input").value;
 
-    if (myUsername && room && password) {
-        // Simulación de validación (DB fetch en el futuro)
-        console.log(isSignUp ? "Registrando..." : "Logueando...", { myUsername, room });
-        
-        socket = new WebSocket(`ws://localhost:3000/room/${room}`);
-        setupSocket();
-    } else {
-        alert("Please fill in all fields (Username, Password and Room).");
+    if (!usernameInput || !passwordInput || (isSignUp && !selectedAvatar) || (!isSignUp && !roomInput)) {
+        alert("Please fill in all fields.");
+        return;
+    }
+
+    const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
+    const payload = { username: usernameInput, password: passwordInput, avatar: selectedAvatar };
+
+    try {
+        const response = await fetch(`http://${HOST}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            if (isSignUp) {
+                alert("Account created! Now you can log in.");
+                linkSwitch.click();
+            } else {
+                authToken = data.token;
+                myUsername = data.username;
+                selectedAvatar = data.avatar;
+                room = roomInput;
+                
+                localStorage.setItem('syncode_token', authToken);
+                connectWebSocket();
+            }
+        } else {
+            alert(data.error || "Authentication failed");
+        }
+    } catch (error) {
+        alert("Error connecting to server.");
     }
 };
 
+// --- 3. WEBSOCKET ---
+
+function connectWebSocket() {
+    socket = new WebSocket(`ws://${HOST}/room/${room}`);
+    setupSocket();
+}
+
 function setupSocket() {
     socket.onopen = () => {
-        // Enviamos el login inicial con nuestro avatar
         socket.send(JSON.stringify({ 
             type: 'login', 
             username: myUsername, 
-            avatar: selectedAvatar 
+            avatar: selectedAvatar,
+            token: authToken 
         }));
         
-        // Cambio de vista
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("chat-app").style.display = "flex";
         document.getElementById("room-display").innerText = "Room: " + room;
-
-        // Update user list al entrar
         updateUserList();
     };
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-
         switch (data.type) {
-            case 'set-id':
-                myId = data.id;
-                break;
-
+            case 'set-id': myId = data.id; break;
             case 'user-connected':
-                // Notificar en el chat y pedir historial si somos los más antiguos
-                appendMessage("System", `User ${data.id} joined the workspace`, "#5865F2", false);
+                appendMessage("System", `User ${data.id} joined`, "#5865F2", false);
                 checkAndSendHistory(data.id);
                 break;
-
             case 'login':
-                // Guardar datos de otros usuarios
                 dbUsers[data.authorId] = { username: data.username, avatar: data.avatar };
                 updateUserList();
                 break;
-
             case 'history-sync':
-                // Sincronización total al entrar (Código + Chat)
                 editor.value = data.code;
                 data.chat.forEach(m => appendMessage(m.user, m.text, getUsernameColor(m.user), false));
                 chatHistory = data.chat;
+                dbUsers = { ...dbUsers, ...data.users };
+                updateUserList();
                 break;
-
             case 'code-update':
-                // Actualizar editor solo si el contenido es diferente (evita bucles)
-                if (data.content !== editor.value) {
-                    editor.value = data.content;
-                }
+                if (data.content !== editor.value) editor.value = data.content;
                 break;
-
             case 'chat':
                 appendMessage(data.user, data.text, getUsernameColor(data.user), false);
                 chatHistory.push({ user: data.user, text: data.text });
                 break;
-
             case 'user-disconnected':
-                appendMessage("System", `User ${data.id} disconnected`, "#ff4444", false);
+                appendMessage("System", `User ${data.id} left`, "#ff4444", false);
                 delete dbUsers[data.id];
                 updateUserList();
                 break;
@@ -136,27 +161,20 @@ function setupSocket() {
     };
 }
 
-// --- 4. SINCRONIZACIÓN DE CÓDIGO Y ESTADO ---
+// --- 4. SINCRONIZACIÓN DEL EDITOR ---
 
-// Cada vez que escribo, envío el código al servidor
 editor.addEventListener('input', () => {
-    socket.send(JSON.stringify({ 
-        type: 'code-update', 
-        content: editor.value 
-    }));
+    socket.send(JSON.stringify({ type: 'code-update', content: editor.value }));
 });
 
 function checkAndSendHistory(newId) {
-    // Lógica del "Host": El usuario con el ID más bajo envía el estado actual al nuevo
     const userIds = Object.keys(dbUsers).map(id => parseInt(id));
     const isOldest = userIds.every(id => id >= myId);
-
     if (isOldest && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
-            type: 'history-sync',
-            targetId: newId,
-            code: editor.value,
-            chat: chatHistory
+            type: 'history-sync', targetId: newId,
+            code: editor.value, chat: chatHistory,
+            users: { [myId]: { username: myUsername, avatar: selectedAvatar }, ...dbUsers }
         }));
     }
 }
@@ -167,108 +185,64 @@ function appendMessage(user, text, color, isOwn) {
     const div = document.createElement("div");
     const isMe = user === myUsername || isOwn;
     div.className = `message-row ${isMe ? 'own-message' : 'other-message'}`;
-    
-    div.innerHTML = `
-        <div class="bubble">
-            <strong style="color:${color}">${user}</strong><br>
-            <span class="msg-content">${text}</span>
-        </div>`;
-        
+    div.innerHTML = `<div class="bubble"><strong style="color:${color}">${user}</strong><br>${text}</div>`;
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function updateUserList() {
     const list = document.getElementById("users-list");
-    // Limpiar la lista
     list.innerHTML = "";
     
-    // You
+    // Usuario local
     const selfLi = document.createElement("li");
     selfLi.className = "user-item";
-    selfLi.innerHTML = `
-        <img src="${selectedAvatar}" class="avatar">
-        <span>${myUsername} (You)</span>
-    `;
+    selfLi.innerHTML = `<img src="${selectedAvatar}" class="avatar"><span>${myUsername} (You)</span>`;
     list.appendChild(selfLi);
     
+    // Otros usuarios
     for (let id in dbUsers) {
         const user = dbUsers[id];
-        
         const li = document.createElement("li");
         li.className = "user-item";
-        li.innerHTML = `
-            <img src="${user.avatar}" class="avatar">
-            <span>${user.username}</span>
-        `;
+        li.innerHTML = `<img src="${user.avatar}" class="avatar"><span>${user.username}</span>`;
         list.appendChild(li);
     }
 }
 
+// --- 6. CONTROLES DE INTERFAZ ---
+
 function toggleSidebar() {
     const layout = document.getElementById("main-layout");
     const btnShow = document.getElementById("btn-show-sidebar");
-    
     layout.classList.toggle("sidebar-hidden");
-    
-    // Mostrar/ocultar el botón de "abrir" según el estado
-    if (layout.classList.contains("sidebar-hidden")) {
-        btnShow.style.display = "block";
-    } else {
-        btnShow.style.display = "none";
-    }
+    btnShow.style.display = layout.classList.contains("sidebar-hidden") ? "block" : "none";
 }
 
 function toggleChat() {
-    const chat = document.getElementById("chat-collapsible");
-    chat.classList.toggle("chat-hidden");
+    document.getElementById("chat-collapsible").classList.toggle("chat-hidden");
 }
 
-// El chat se abre automáticamente al recibir un mensaje si está cerrado
-const originalAppendMessage = appendMessage;
-appendMessage = function(user, text, color, isOwn) {
-    originalAppendMessage(user, text, color, isOwn);
-    if (!isOwn) {
-        document.getElementById("chat-collapsible").classList.remove("chat-hidden");
-    }
-};
-
-// Enviar mensajes
 function sendMessage() {
     const text = msgInput.value.trim();
     if (!text) return;
-
-    const msgObj = { 
-        type: 'chat', 
-        user: myUsername, 
-        text: text,
-        targetId: targetId // Reservado para mensajes privados... en el futuro
-    };
-
-    socket.send(JSON.stringify(msgObj));
+    socket.send(JSON.stringify({ type: 'chat', user: myUsername, text: text }));
     appendMessage(myUsername, text, getUsernameColor(myUsername), true);
     chatHistory.push({ user: myUsername, text: text });
     msgInput.value = "";
 }
 
 document.getElementById("btn-send").onclick = sendMessage;
-msgInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendMessage();
-});
+msgInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
 
-// Emojis
 document.querySelectorAll(".emoji-btn").forEach(btn => {
-    btn.onclick = () => {
-        msgInput.value += btn.innerText;
-        msgInput.focus();
-    };
+    btn.onclick = () => { msgInput.value += btn.innerText; msgInput.focus(); };
 });
 
-// Helper: Color único por usuario
+// --- UTILIDADES ---
+
 function getUsernameColor(username) {
     let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    for (let i = 0; i < username.length; i++) hash = username.charCodeAt(i) + ((hash << 5) - hash);
     return `hsl(${Math.abs(hash % 360)}, 70%, 60%)`;
 }
