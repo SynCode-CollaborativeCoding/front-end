@@ -246,6 +246,24 @@ body {
 }
 
 /* UI Elements */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+#lang-indicator {
+    background: #3776ab;
+    color: #ffde57;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid #ffde57;
+}
+
 .toggle-btn {
     background: transparent;
     border: 1px solid #444;
@@ -346,4 +364,26 @@ body {
 
 #link-switch:hover {
     text-decoration: underline;
+}
+.editor-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    font-size: 16px;
+}
+
+.CodeMirror {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100% !important;
+    width: 100% !important;
+}
+
+.CodeMirror-vscrollbar, .CodeMirror-hscrollbar {
+    background: #1e1e1e;
 }

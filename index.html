@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>SynCode | Collaborative IDE</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
     <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="script.js"></script>
 </head>
 <body>
     <div id="login-screen" class="full-view">
@@ -46,13 +54,15 @@
                     
                     <div class="editor-toolbar">
                         <button class="tool-btn" id="btn-save">💾 Save</button>
-                        <button class="tool-btn" id="btn-import">📁 Import</button>
+                        <button class="tool-btn" id="btn-import" onclick="fillDummyCode()">📁 Import</button>
                         <button class="tool-btn" id="btn-download">📥 Download</button>
                     </div>
-                    <button class="toggle-btn" id="btn-toggle-chat" onclick="toggleChat()">💬 Chat ▼</button>
+
+                    <div class="header-right">
+                        <span id="lang-indicator" onclick="changeLanguage()">🐍 Python</span>
+                        <button class="toggle-btn" id="btn-toggle-chat" onclick="toggleChat()">💬 Chat ▼</button>
+                    </div>
                 </header>
-
-
                 
                 <div class="editor-wrapper">
                     <textarea id="editor" spellcheck="false" placeholder="// Start coding together..."></textarea>
@@ -75,6 +85,5 @@
             </main>
         </div>
     </div>
-    <script src="script.js"></script>
 </body>
 </html>
