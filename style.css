@@ -127,10 +127,16 @@ body {
     border-bottom: 1px solid #333;
 }
 
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid #444;
+}
+
 #users-list {
     list-style: none;
     padding: 10px;
     overflow-y: auto;
+    flex-grow: 1;
 }
 
 /* Main Content Area */
@@ -292,6 +298,22 @@ body {
 .tool-btn:hover {
     background: #444;
     color: #fff;
+}
+
+.logout-btn {
+    width: 100%;
+    padding: 10px;
+    background-color: #ff4757;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: #ff6b81;
 }
 
 .show-sidebar-btn {

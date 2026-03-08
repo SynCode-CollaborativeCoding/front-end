@@ -261,6 +261,14 @@ function changeLanguage() {
     codeEditor.refresh();
 }
 
+function logout() {
+    if (socket) {
+        socket.close();
+    }
+    localStorage.clear();
+    location.reload();
+}
+
 function sendMessage() {
     const inp = document.getElementById("msg-input");
     if (!inp.value.trim()) return;
