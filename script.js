@@ -121,7 +121,7 @@ async function handleAuth() {
                 authToken = data.token;
                 myUsername = data.username;
                 myAvatar = data.avatar;
-                room = data.room;
+                room = roomIn;
 
                 // Guardar en localStorage para reconexión automática
                 localStorage.setItem("authToken", authToken);
