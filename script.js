@@ -1,5 +1,6 @@
 // --- VARIABLES GLOBALES ---
-let socket, myId, myUsername, room, selectedAvatar, authToken, codeEditor;
+let socket, myId, myUsername, room, myAvatar, authToken, codeEditor;
+let selectedAvatar = null;
 let isSignUp = false;
 let chatHistory = [];
 let dbUsers = {}; 
@@ -15,7 +16,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const msgInput = document.getElementById("msg-input");
     const btnSend = document.getElementById("btn-send");
 
-    // A. Inicializar CodeMirror (si existe el textarea)
+    // A. Intentar reconexión automática si hay token guardado
+    authToken = localStorage.getItem("authToken");
+    myUsername = localStorage.getItem("myUsername");
+    myAvatar = localStorage.getItem("myAvatar");
+    room = localStorage.getItem("room");
+
+    if (authToken && myUsername) {
+        console.log("[AUTH] Session restored for ${myUsername} in room ${room}");
+        connectWebSocket();
+    }
+
+    // B. Inicializar CodeMirror
     if (editorTextArea) {
         codeEditor = CodeMirror.fromTextArea(editorTextArea, {
             lineNumbers: true, mode: "python", theme: "dracula",
@@ -28,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // B. Inicializar Avatares (si existe el grid)
+    // C. Inicializar Avatares (si existe el grid)
     if (avatarGrid) {
         for (let i = 1; i <= 8; i++) {
             const img = document.createElement("img");
@@ -45,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
         avatarGrid.style.display = "none";
     }
 
-    // C. Eventos de Auth
+    // D. Eventos de Auth
     if (linkSwitch) {
         linkSwitch.onclick = (e) => {
             e.preventDefault();
@@ -76,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnSend) btnSend.onclick = sendMessage;
     if (msgInput) msgInput.onkeydown = (e) => { if (e.key === "Enter") sendMessage(); };
 
-    // D. Emojis
+    // E. Emojis
     document.querySelectorAll(".emoji-btn").forEach(btn => {
         btn.onclick = () => { if(msgInput) { msgInput.value += btn.innerText; msgInput.focus(); } };
     });
@@ -95,7 +107,7 @@ async function handleAuth() {
     try {
         const resp = await fetch(`http://${HOST}${endpoint}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: userIn, password: passIn, avatar: selectedAvatar })
+            body: JSON.stringify({ username: userIn, password: passIn, avatar: selectedAvatar, room: roomIn })
         });
 
         const data = await resp.json();
@@ -108,8 +120,15 @@ async function handleAuth() {
             else { 
                 authToken = data.token;
                 myUsername = data.username;
-                selectedAvatar = data.avatar;
-                room = roomIn;
+                myAvatar = data.avatar;
+                room = data.room;
+
+                // Guardar en localStorage para reconexión automática
+                localStorage.setItem("authToken", authToken);
+                localStorage.setItem("myUsername", myUsername);
+                localStorage.setItem("myAvatar", myAvatar);
+                localStorage.setItem("room", room);
+
                 connectWebSocket(); 
             }
         } else alert(data.error);
@@ -119,7 +138,7 @@ async function handleAuth() {
 function connectWebSocket() {
     socket = new WebSocket(`ws://${HOST}/room/${room}?token=${authToken}`);
     socket.onopen = () => {
-        socket.send(JSON.stringify({ type: 'login', username: myUsername, avatar: selectedAvatar }));
+        socket.send(JSON.stringify({ type: 'login', username: myUsername, avatar: myAvatar }));
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("chat-app").style.display = "flex";
         document.getElementById("room-display").innerText = "Room: " + room;
@@ -131,7 +150,10 @@ function connectWebSocket() {
     socket.onclose = (event) => {
         if (event.code === 4001 || event.code === 4002) {
             alert("Sesión inválida o expirada. Por favor, logueate de nuevo.");
+            localStorage.clear();
             location.reload();
+        } else if (event.code === 4003) {
+            alert("Ya estás conectado a esta sala en otra pestaña.")
         }
     };
 }
@@ -176,7 +198,7 @@ function checkAndSendHistory(newId) {
         socket.send(JSON.stringify({
             type: 'history-sync', targetId: newId,
             code: codeEditor.getValue(), chat: chatHistory,
-            users: { [myId]: { username: myUsername, avatar: selectedAvatar }, ...dbUsers }
+            users: { [myId]: { username: myUsername, avatar: myAvatar }, ...dbUsers }
         }));
     }
 }
@@ -193,7 +215,7 @@ function appendMessage(user, text, color, isOwn) {
 
 function updateUserList() {
     const list = document.getElementById("users-list");
-    list.innerHTML = `<li class="user-item"><img src="${selectedAvatar}" class="avatar"><span>${myUsername} (You)</span></li>`;
+    list.innerHTML = `<li class="user-item"><img src="${myAvatar}" class="avatar"><span>${myUsername} (You)</span></li>`;
     for (let id in dbUsers) {
         const u = dbUsers[id];
         list.innerHTML += `<li class="user-item"><img src="${u.avatar}" class="avatar"><span>${u.username}</span></li>`;
@@ -280,3 +302,10 @@ greet_users(user_list)`;
         socket.send(JSON.stringify({ type: 'code-update', content: codeEditor.getValue() }));
     }
 }
+
+// When pressing Ctrl+Shift+D, update user list
+document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && e.code === "KeyD") {
+        updateUserList();
+    }
+});
