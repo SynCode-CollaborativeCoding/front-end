@@ -25,6 +25,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (authToken && myUsername && room) {
         console.log(`[AUTH] Session restored for ${myUsername} in room ${room}`);
         connectWebSocket();
+    } else if (authToken && myUsername) {
+        document.getElementById("username-input").value = myUsername;
+        document.getElementById("username-input").disabled = true;
+        document.getElementById("password-input").style.display = "none";
+        document.getElementById("avatar-grid").style.display = "none";
+        document.getElementById("login-label").style.display = "none";
+        document.getElementById("auth-title").innerText = "Change Room";
+
+        const roomInput = document.getElementById("room-input");
+        roomInput.value = "";
+        roomInput.style.display = "block";
     }
 
     // B. Inicializar CodeMirror
@@ -101,7 +112,16 @@ async function handleAuth() {
     const passIn = document.getElementById("password-input").value;
     const roomIn = document.getElementById("room-input").value;
 
-    if (!userIn || !passIn || (!isSignUp && !roomIn)) return alert("Fill all fields");
+    const isChangingRoom = !!authToken;
+
+    if (!userIn || (!isChangingRoom && !passIn) || (!isSignUp && !roomIn)) return alert("Fill all fields");
+
+    if (isChangingRoom) {
+        room = roomIn;
+        localStorage.setItem("room", room);
+        connectWebSocket();
+        return;
+    }
 
     const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
     try {
@@ -266,6 +286,12 @@ function logout() {
         socket.close();
     }
     localStorage.clear();
+    location.reload();
+}
+
+function changeRoom() {
+    if (socket) socket.close();
+    localStorage.removeItem("room");
     location.reload();
 }
 

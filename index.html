@@ -17,7 +17,7 @@
     <div id="login-screen" class="full-view">
         <div class="login-box">
             <h2 id="auth-title">Join SynCode Room</h2>
-            <p class="login-label">Select your avatar:</p>
+            <p class="login-label" id="login-label">Select your avatar:</p>
             <div id="avatar-grid"></div>
 
             <div class="input-group">
@@ -44,7 +44,10 @@
                 </div>
                 <ul id="users-list"></ul>
                 <div class="sidebar-footer">
-                    <button id="btn-logout" class="logout-btn" onclick="logout()">Logout</button>
+                    <div class="footer-buttons">
+                        <button id="btn-change-room" class="tool-btn secondary" onclick="changeRoom()">Room</button>
+                        <button id="btn-logout" class="logout-btn" onclick="logout()">Logout</button>
+                    </div>
                 </div>
             </aside>
 

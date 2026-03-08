@@ -1,15 +1,15 @@
+/* --- GLOBAL & RESET --- */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
     height: 100%;
     width: 100%;
     overflow: hidden;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #121212;
     color: white;
 }
@@ -57,9 +57,7 @@ body {
     transform: scale(1.1);
 }
 
-#username-input,
-#password-input,
-#room-input {
+#username-input, #password-input, #room-input {
     width: 100%;
     padding: 10px;
     margin-top: 10px;
@@ -67,6 +65,7 @@ body {
     border: none;
     background: #2c2c2c;
     color: white;
+    outline: none;
 }
 
 #btn-connect {
@@ -79,18 +78,11 @@ body {
     border-radius: 6px;
     cursor: pointer;
     font-weight: bold;
+    transition: background 0.2s;
 }
 
-.auth-switch {
-    margin-top: 15px;
-    font-size: 0.85em;
-    color: #b9bbbe;
-}
-
-#link-switch {
-    color: #5865F2;
-    text-decoration: none;
-    font-weight: bold;
+#btn-connect:hover {
+    background: #4752c4;
 }
 
 /* --- MAIN LAYOUT --- */
@@ -127,11 +119,6 @@ body {
     border-bottom: 1px solid #333;
 }
 
-.sidebar-footer {
-    padding: 15px;
-    border-top: 1px solid #444;
-}
-
 #users-list {
     list-style: none;
     padding: 10px;
@@ -139,7 +126,40 @@ body {
     flex-grow: 1;
 }
 
-/* Main Content Area */
+/* --- NUEVA SECCIÓN: BOTONES INFERIORES SIDEBAR --- */
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid #333;
+    background: #1a1a1a;
+}
+
+.footer-buttons {
+    display: flex;
+    gap: 8px; /* Espacio entre los dos botones */
+}
+
+.footer-buttons .logout-btn, 
+.footer-buttons .tool-btn {
+    flex: 1; /* Ambos botones ocupan el mismo ancho */
+    padding: 8px 2px;
+    font-size: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Estilo específico para botón de sala (azul suave/grisáceo) */
+.tool-btn.secondary {
+    background: #4f545c;
+    color: white;
+}
+
+.tool-btn.secondary:hover {
+    background: #686d73;
+}
+
+/* --- MAIN CONTENT AREA --- */
 .main-content {
     display: flex;
     flex-direction: column;
@@ -166,30 +186,29 @@ body {
 .editor-wrapper {
     flex: 1;
     position: relative;
-    background: #1e1e1e;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #282a36; /* Fondo Dracula */
 }
 
-#editor {
-    width: 100%;
-    height: 100%;
-    background: #1e1e1e;
-    color: #d4d4d4;
-    border: none;
-    padding: 20px;
+.CodeMirror {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    height: 100% !important;
+    width: 100% !important;
     font-family: 'Consolas', monospace;
-    font-size: 16px;
-    resize: none;
-    outline: none;
+    font-size: 15px;
 }
 
-/* Collapsible Chat Panel */
+/* Chat Panel */
 #chat-collapsible {
-    height: 50%;
+    height: 40%;
     background: #121212;
     display: flex;
     flex-direction: column;
     transition: height 0.3s ease, opacity 0.2s;
-    border-top: 1px solid #333;
+    border-top: 2px solid #333;
 }
 
 #chat-collapsible.chat-hidden {
@@ -199,7 +218,6 @@ body {
     border: none;
 }
 
-/* Chat Log & Input */
 #messages-log {
     flex: 1;
     overflow-y: auto;
@@ -215,21 +233,6 @@ body {
 .input-row {
     display: flex;
     gap: 10px;
-}
-
-#emoji-bar {
-    margin-bottom: 8px;
-    display: flex;
-    gap: 5px;
-}
-
-.emoji-btn {
-    background: #2c2c2c;
-    border: none;
-    color: white;
-    padding: 5px 8px;
-    border-radius: 4px;
-    cursor: pointer;
 }
 
 #msg-input {
@@ -251,13 +254,7 @@ body {
     cursor: pointer;
 }
 
-/* UI Elements */
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
+/* UI ELEMENTS */
 #lang-indicator {
     background: #3776ab;
     color: #ffde57;
@@ -265,8 +262,7 @@ body {
     border-radius: 4px;
     font-size: 12px;
     font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    cursor: pointer;
     border: 1px solid #ffde57;
 }
 
@@ -277,11 +273,6 @@ body {
     cursor: pointer;
     padding: 2px 8px;
     border-radius: 4px;
-    font-size: 12px;
-}
-
-#btn-toggle-chat {
-    font-size: 20px;
 }
 
 .tool-btn {
@@ -292,38 +283,19 @@ body {
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-}
-
-.tool-btn:hover {
-    background: #444;
-    color: #fff;
 }
 
 .logout-btn {
-    width: 100%;
-    padding: 10px;
-    background-color: #ff4757;
+    background-color: #ed4245; /* Rojo Discord */
     color: white;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
-    transition: background 0.3s;
 }
 
 .logout-btn:hover {
-    background-color: #ff6b81;
-}
-
-.show-sidebar-btn {
-    display: none;
-}
-
-.avatar {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    background-color: #c03537;
 }
 
 .user-item {
@@ -332,12 +304,12 @@ body {
     gap: 10px;
     padding: 8px;
     border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9em;
 }
 
-.user-item:hover {
-    background: #2c2c2c;
+.avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
 }
 
 /* Bubbles */
@@ -360,16 +332,6 @@ body {
 
 .own-message .bubble {
     background: #5865F2;
-    border-bottom-right-radius: 2px;
-}
-#password-input {
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    border-radius: 6px;
-    border: none;
-    background: #2c2c2c;
-    color: white;
 }
 
 .auth-switch {
@@ -384,28 +346,17 @@ body {
     font-weight: bold;
 }
 
-#link-switch:hover {
-    text-decoration: underline;
-}
-.editor-wrapper {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
+#emoji-bar {
+    margin-bottom: 8px;
     display: flex;
-    flex-direction: column;
-    font-size: 16px;
+    gap: 5px;
 }
 
-.CodeMirror {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 100% !important;
-    width: 100% !important;
-}
-
-.CodeMirror-vscrollbar, .CodeMirror-hscrollbar {
-    background: #1e1e1e;
+.emoji-btn {
+    background: #2c2c2c;
+    border: none;
+    color: white;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
 }
