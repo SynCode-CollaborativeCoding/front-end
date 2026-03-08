@@ -22,8 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
     myAvatar = localStorage.getItem("myAvatar");
     room = localStorage.getItem("room");
 
-    if (authToken && myUsername) {
-        console.log("[AUTH] Session restored for ${myUsername} in room ${room}");
+    if (authToken && myUsername && room) {
+        console.log(`[AUTH] Session restored for ${myUsername} in room ${room}`);
         connectWebSocket();
     }
 
@@ -148,12 +148,21 @@ function connectWebSocket() {
     socket.onmessage = handleSocketMessage;
 
     socket.onclose = (event) => {
+        document.getElementById("login-screen").style.display = "flex";
+        document.getElementById("chat-app").style.display = "none";
+
+        dbUsers = {};
+        chatHistory = [];
+        updateUserList();
+
         if (event.code === 4001 || event.code === 4002) {
             alert("Sesión inválida o expirada. Por favor, logueate de nuevo.");
             localStorage.clear();
             location.reload();
         } else if (event.code === 4003) {
             alert("Ya estás conectado a esta sala en otra pestaña.")
+        } else {
+            console.warn("[WS] Connection closed:", event.code);
         }
     };
 }
