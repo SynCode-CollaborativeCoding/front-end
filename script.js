@@ -97,22 +97,29 @@ async function handleAuth() {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: userIn, password: passIn, avatar: selectedAvatar })
         });
+
         const data = await resp.json();
+
         if (resp.ok) {
-            if (isSignUp) { alert("Created!"); document.getElementById("link-switch").click(); }
+            if (isSignUp) { 
+                alert("Account created! Please log in.");
+                document.getElementById("link-switch").click();
+            }
             else { 
-                authToken = data.token; myUsername = data.username; 
-                selectedAvatar = data.avatar; room = roomIn;
+                authToken = data.token;
+                myUsername = data.username;
+                selectedAvatar = data.avatar;
+                room = roomIn;
                 connectWebSocket(); 
             }
         } else alert(data.error);
-    } catch (e) { alert("Server error"); }
+    } catch (e) { alert("Server error connecting to API"); }
 }
 
 function connectWebSocket() {
-    socket = new WebSocket(`ws://${HOST}/room/${room}`);
+    socket = new WebSocket(`ws://${HOST}/room/${room}?token=${authToken}`);
     socket.onopen = () => {
-        socket.send(JSON.stringify({ type: 'login', username: myUsername, avatar: selectedAvatar, token: authToken }));
+        socket.send(JSON.stringify({ type: 'login', username: myUsername, avatar: selectedAvatar }));
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("chat-app").style.display = "flex";
         document.getElementById("room-display").innerText = "Room: " + room;
@@ -120,6 +127,13 @@ function connectWebSocket() {
         setTimeout(() => codeEditor.refresh(), 100);
     };
     socket.onmessage = handleSocketMessage;
+
+    socket.onclose = (event) => {
+        if (event.code === 4001 || event.code === 4002) {
+            alert("Sesión inválida o expirada. Por favor, logueate de nuevo.");
+            location.reload();
+        }
+    };
 }
 
 function handleSocketMessage(event) {
