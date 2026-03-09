@@ -11,9 +11,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
-    <script src="script.js"></script>
+    <script src="script.js" defer></script>
 </head>
 <body>
+
     <div id="login-screen" class="full-view">
         <div class="login-box">
             <h2 id="auth-title">Join SynCode Room</h2>
@@ -23,7 +24,6 @@
             <div class="input-group">
                 <input type="text" id="username-input" placeholder="Username" autocomplete="off">
                 <input type="password" id="password-input" placeholder="Password">
-                <input type="text" id="room-input" placeholder="Room Name" autocomplete="off">
             </div>
             
             <button id="btn-connect">Connect & Sync</button>
@@ -34,7 +34,38 @@
         </div>
     </div>
 
-    <div id="chat-app" class="full-view">
+    <div id="lobby-screen" class="full-view" style="display: none;">
+        <div class="lobby-box">
+            <div class="lobby-header">
+                <h2>Available Rooms</h2>
+                <button id="btn-open-create-room" class="tool-btn success">➕ New Room</button>
+            </div>
+            
+            <div id="rooms-container">
+                <p class="loading-text">Loading rooms...</p>
+            </div>
+
+            <div class="lobby-footer">
+                <button onclick="logout()" class="link-btn">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-room-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Create New Workspace</h3>
+            <div class="input-group">
+                <input type="text" id="new-room-name" placeholder="Room Name (unique)">
+                <textarea id="new-room-desc" placeholder="What is this project about?"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button id="btn-create-room-save" class="tool-btn success">Create Room</button>
+                <button id="btn-create-room-cancel" class="tool-btn secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-app" class="full-view" style="display: none;">
         <div class="grid-container" id="main-layout">
             
             <aside class="sidebar" id="sidebar">
@@ -43,10 +74,11 @@
                     <button class="toggle-btn" onclick="toggleSidebar()">◀</button>
                 </div>
                 <ul id="users-list"></ul>
+                
                 <div class="sidebar-footer">
                     <div class="footer-buttons">
-                        <button id="btn-change-room" class="tool-btn secondary" onclick="changeRoom()">Room</button>
-                        <button id="btn-logout" class="logout-btn" onclick="logout()">Logout</button>
+                        <button id="btn-change-room" class="tool-btn secondary" onclick="changeRoom()">Rooms</button>
+                        <button id="btn-logout-sidebar" class="logout-btn" onclick="logout()">Logout</button>
                     </div>
                 </div>
             </aside>
@@ -78,8 +110,10 @@
                     <div id="messages-log"></div>
                     <div class="input-zone">
                         <div id="emoji-bar">
-                            <button class="emoji-btn">😂</button><button class="emoji-btn">😎</button>
-                            <button class="emoji-btn">🔥</button><button class="emoji-btn">💡</button>
+                            <button class="emoji-btn">😂</button>
+                            <button class="emoji-btn">😎</button>
+                            <button class="emoji-btn">🔥</button>
+                            <button class="emoji-btn">💡</button>
                             <button class="emoji-btn">👍</button>
                         </div>
                         <div class="input-row">
@@ -91,5 +125,6 @@
             </main>
         </div>
     </div>
+
 </body>
 </html>

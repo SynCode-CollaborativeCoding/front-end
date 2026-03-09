@@ -360,3 +360,173 @@ html, body {
     border-radius: 4px;
     cursor: pointer;
 }
+
+/* --- LOBBY SCREEN STYLES --- */
+#lobby-screen {
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle, #1a1a1a 0%, #121212 100%);
+}
+
+.lobby-box {
+    background: #1e1e1e;
+    padding: 30px;
+    border-radius: 12px;
+    width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+    border: 1px solid #333;
+}
+
+.lobby-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #333;
+}
+
+/* Contenedor de las Cards */
+#rooms-container {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Dos columnas de salas */
+    gap: 15px;
+    padding-right: 10px;
+}
+
+/* Estilo de las Cards de Sala */
+.room-card {
+    background: #2c2c2c;
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.room-card:hover {
+    background: #36393f;
+    border-color: #5865F2;
+    transform: translateY(-2px);
+}
+
+.room-card h4 {
+    color: #5865F2;
+    font-size: 1.1em;
+}
+
+.room-card p {
+    font-size: 0.85em;
+    color: #b9bbbe;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.room-card small {
+    font-size: 0.75em;
+    color: #72767d;
+}
+
+.lobby-footer {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: #ed4245;
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: 0.9em;
+}
+
+/* --- MODAL STYLES --- */
+.modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.modal-content {
+    background: #1e1e1e;
+    padding: 25px;
+    border-radius: 12px;
+    width: 400px;
+    border: 1px solid #444;
+    box-shadow: 0 0 30px rgba(0,0,0,1);
+}
+
+.modal-content h3 {
+    margin-bottom: 15px;
+    color: white;
+}
+
+.modal-content input, 
+.modal-content textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    border: none;
+    background: #2c2c2c;
+    color: white;
+    font-family: inherit;
+    outline: none;
+}
+
+.modal-content textarea {
+    height: 100px;
+    resize: none;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Colores de botones específicos */
+.tool-btn.success {
+    background: #248046;
+    color: white;
+}
+.tool-btn.success:hover {
+    background: #1a6334;
+}
+
+.tool-btn.secondary {
+    background: #4f545c;
+}
+
+/* Texto de carga */
+.loading-text {
+    grid-column: span 2;
+    text-align: center;
+    color: #72767d;
+    padding: 40px;
+}
+
+/* Scrollbar personalizada para el lobby */
+#rooms-container::-webkit-scrollbar {
+    width: 6px;
+}
+#rooms-container::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 10px;
+}

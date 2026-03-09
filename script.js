@@ -22,20 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
     myAvatar = localStorage.getItem("myAvatar");
     room = localStorage.getItem("room");
 
-    if (authToken && myUsername && room) {
-        console.log(`[AUTH] Session restored for ${myUsername} in room ${room}`);
-        connectWebSocket();
-    } else if (authToken && myUsername) {
-        document.getElementById("username-input").value = myUsername;
-        document.getElementById("username-input").disabled = true;
-        document.getElementById("password-input").style.display = "none";
-        document.getElementById("avatar-grid").style.display = "none";
-        document.getElementById("login-label").style.display = "none";
-        document.getElementById("auth-title").innerText = "Change Room";
-
-        const roomInput = document.getElementById("room-input");
-        roomInput.value = "";
-        roomInput.style.display = "block";
+    if (authToken && myUsername) {
+        if (room) {
+            // Si tiene token y sala guardada, entra directo
+            connectWebSocket();
+        } else {
+            // Si tiene token pero no sala, al lobby
+            showLobby();
+        }
     }
 
     // B. Inicializar CodeMirror
@@ -110,24 +104,14 @@ document.addEventListener("DOMContentLoaded", () => {
 async function handleAuth() {
     const userIn = document.getElementById("username-input").value;
     const passIn = document.getElementById("password-input").value;
-    const roomIn = document.getElementById("room-input").value;
-
-    const isChangingRoom = !!authToken;
-
-    if (!userIn || (!isChangingRoom && !passIn) || (!isSignUp && !roomIn)) return alert("Fill all fields");
-
-    if (isChangingRoom) {
-        room = roomIn;
-        localStorage.setItem("room", room);
-        connectWebSocket();
-        return;
-    }
+    
+    if (!userIn || (!isSignUp && !passIn)) return alert("Fill all fields");
 
     const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login';
     try {
         const resp = await fetch(`http://${HOST}${endpoint}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: userIn, password: passIn, avatar: selectedAvatar, room: roomIn })
+            body: JSON.stringify({ username: userIn, password: passIn, avatar: selectedAvatar})
         });
 
         const data = await resp.json();
@@ -141,15 +125,13 @@ async function handleAuth() {
                 authToken = data.token;
                 myUsername = data.username;
                 myAvatar = data.avatar;
-                room = roomIn;
 
                 // Guardar en localStorage para reconexión automática
                 localStorage.setItem("authToken", authToken);
                 localStorage.setItem("myUsername", myUsername);
                 localStorage.setItem("myAvatar", myAvatar);
-                localStorage.setItem("room", room);
 
-                connectWebSocket(); 
+                showLobby();
             }
         } else alert(data.error);
     } catch (e) { alert("Server error connecting to API"); }
@@ -162,6 +144,7 @@ function connectWebSocket() {
         document.getElementById("login-screen").style.display = "none";
         document.getElementById("chat-app").style.display = "flex";
         document.getElementById("room-display").innerText = "Room: " + room;
+        document.getElementById("lobby-screen").style.display = "none";
         updateUserList();
         setTimeout(() => codeEditor.refresh(), 100);
     };
@@ -309,6 +292,80 @@ function getUsernameColor(u) {
     for (let i = 0; i < u.length; i++) hash = u.charCodeAt(i) + ((hash << 5) - hash);
     return `hsl(${Math.abs(hash % 360)}, 70%, 60%)`;
 }
+
+// --- 3. Room Management ---
+async function showLobby() {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("chat-app").style.display = "none";
+    document.getElementById("lobby-screen").style.display = "flex";
+
+    try {
+        const resp = await fetch(`http://${HOST}/api/rooms`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const roomsData = await resp.json();
+        renderRooms(roomsData);
+    } catch (e) {
+        alert("Error loading rooms");
+    }
+}
+
+function renderRooms(roomsArray) {
+    const container = document.getElementById("rooms-container");
+    container.innerHTML = "";
+
+    if (roomsArray.length === 0) {
+        container.innerHTML = "<p>No rooms found. Create the first one!</p>";
+        return;
+    }
+
+    roomsArray.forEach(r => {
+        const card = document.createElement("div");
+        card.className = "room-card";
+        card.innerHTML = `
+            <h4>${r.room_name}</h4>
+            <p>${r.description || 'No description'}</p>
+            <small>Created: ${new Date(r.created_at).toLocaleDateString()}</small>
+        `;
+        card.onclick = () => {
+            room = r.room_name;
+            localStorage.setItem("room", room);
+            connectWebSocket();
+        };
+        container.appendChild(card);
+    });
+}
+
+// Lógica para crear sala
+document.getElementById("btn-open-create-room").onclick = () => {
+    document.getElementById("create-room-modal").style.display = "flex";
+};
+
+document.getElementById("btn-create-room-save").onclick = async () => {
+    const name = document.getElementById("new-room-name").value;
+    const desc = document.getElementById("new-room-desc").value;
+
+    if (!name) return alert("Room name is required");
+
+    try {
+        const resp = await fetch(`http://${HOST}/api/rooms`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ room_name: name, description: desc })
+        });
+        
+        if (resp.ok) {
+            document.getElementById("create-room-modal").style.display = "none";
+            showLobby(); // Refrescar lista
+        } else {
+            const err = await resp.json();
+            alert(err.error);
+        }
+    } catch (e) { alert("Error creating room"); }
+};
 
 // DEBUG FUNCTIONS
 // Fill editor with dummy code
