@@ -57,6 +57,13 @@
             <div class="input-group">
                 <input type="text" id="new-room-name" placeholder="Room Name (unique)">
                 <textarea id="new-room-desc" placeholder="What is this project about?"></textarea>
+                
+                <label class="modal-label">Project Link:</label>
+                <select id="select-project-choice">
+                    <option value="new">-- Create New Project --</option>
+                </select>
+                    
+                <input type="text" id="new-project-name-input" placeholder="Name for your NEW project">
             </div>
             <div class="modal-buttons">
                 <button id="btn-create-room-save" class="tool-btn success">Create Room</button>
@@ -123,6 +130,21 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <div id="import-project-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Import Project</h3>
+            <p>Select a project to load its code into the current room:</p>
+            <div class="input-group">
+                <select id="select-import-project">
+                    </select>
+            </div>
+            <div class="modal-buttons">
+                <button id="btn-confirm-import" class="tool-btn success">Import Now</button>
+                <button id="btn-cancel-import" class="tool-btn secondary">Cancel</button>
+            </div>
         </div>
     </div>
 

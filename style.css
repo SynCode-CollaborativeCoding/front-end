@@ -428,6 +428,7 @@ html, body {
     color: #b9bbbe;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -529,4 +530,78 @@ html, body {
 #rooms-container::-webkit-scrollbar-thumb {
     background: #333;
     border-radius: 10px;
+}
+
+/* --- PROJETOS & FORM EXTENSIONS --- */
+
+/* Etiquetas dentro de modales */
+.modal-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+    color: #b9bbbe;
+    text-align: left;
+}
+
+/* Estilos para selectores (dropdowns) */
+#select-project-choice, 
+#select-import-project {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    border: none;
+    background: #2c2c2c;
+    color: white;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    border: 1px solid #333;
+}
+
+#select-project-choice:focus, 
+#select-import-project:focus {
+    border-color: #5865F2;
+}
+
+/* Texto de información pequeña */
+.small-info {
+    font-size: 0.75em;
+    color: #72767d;
+    margin-bottom: 15px;
+    text-align: left;
+    font-style: italic;
+}
+
+/* Input para nombre de nuevo proyecto (condicional) */
+#new-project-name-input {
+    display: block; /* El JS controlará si se oculta o no */
+    border: 1px dashed #5865F2 !important;
+    background: #1a1a1a !important;
+}
+
+/* Agrupación de botones en el header del Lobby */
+.header-btns {
+    display: flex;
+    gap: 10px;
+}
+
+/* Botón de éxito (Verde) */
+.tool-btn.success {
+    background: #248046;
+    color: white;
+}
+
+.tool-btn.success:hover {
+    background: #1a6334;
+}
+
+/* Animación simple para aparición de modales */
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-content {
+    animation: modalFadeIn 0.3s ease-out;
 }
