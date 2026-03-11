@@ -76,13 +76,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 btnConnect.innerText = "Register & Join";
                 switchText.innerHTML = 'Already have an account? <a href="#" id="link-switch">Log In</a>';
                 avatarGrid.style.display = "grid";
-                roomInput.style.display = "none";
             } else {
                 title.innerText = "Join SynCode Room";
                 btnConnect.innerText = "Connect & Sync";
                 switchText.innerHTML = 'Don\'t have an account? <a href="#" id="link-switch">Sign Up</a>';
                 avatarGrid.style.display = "none";
-                roomInput.style.display = "block";
             }
             // Re-vincular porque el innerHTML destruye el nodo anterior
             document.getElementById("link-switch").onclick = linkSwitch.onclick;
