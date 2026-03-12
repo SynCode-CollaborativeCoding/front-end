@@ -1,9 +1,10 @@
 // --- VARIABLES GLOBALES ---
 let socket, myId, myUsername, room, myAvatar, authToken, codeEditor;
+let currentProjectId = null, currentProjectName = null;
 let selectedAvatar = null;
 let isSignUp = false;
 let chatHistory = [];
-let dbUsers = {}; 
+let dbUsers = {};
 const HOST = "localhost:3000";
 
 // --- 1. INICIALIZACIÓN SEGURA ---
@@ -128,7 +129,7 @@ async function handleAuth() {
 
 function connectWebSocket() {
     socket = new WebSocket(`ws://${HOST}/room/${room}?token=${authToken}`);
-    
+
     socket.onopen = async () => {
         socket.send(JSON.stringify({ type: 'login', username: myUsername, avatar: myAvatar }));
         document.getElementById("login-screen").style.display = "none";
@@ -136,6 +137,9 @@ function connectWebSocket() {
         document.getElementById("room-display").innerText = "Room: " + room;
         document.getElementById("lobby-screen").style.display = "none";
         updateUserList();
+
+        // Load current project info
+        await loadProjectInfo();
 
         // P2P: Cargar proyecto si la sala está vacía
         setTimeout(async () => {
@@ -151,7 +155,7 @@ function connectWebSocket() {
         }, 500);
         setTimeout(() => codeEditor.refresh(), 100);
     };
-    
+
     socket.onmessage = handleSocketMessage;
     socket.onclose = (e) => {
         if (e.code === 4004) {
@@ -189,10 +193,55 @@ function handleSocketMessage(event) {
             appendMessage(data.user, data.text, getUsernameColor(data.user), false);
             chatHistory.push({ user: data.user, text: data.text });
             break;
+        case 'project-changed':
+            currentProjectId = data.projectId;
+            currentProjectName = data.projectName;
+            updateProjectDisplay();
+            break;
         case 'user-disconnected':
             delete dbUsers[data.id];
             updateUserList();
             break;
+    }
+}
+
+async function loadProjectInfo() {
+    try {
+        // Fetch all rooms to find the current one
+        const roomsResp = await fetch(`http://${HOST}/api/rooms`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const rooms = await roomsResp.json();
+        const currentRoom = rooms.find(r => r.room_name === room);
+
+        if (currentRoom && currentRoom.actual_project_id) {
+            currentProjectId = currentRoom.actual_project_id;
+
+            // Fetch the project info (works even if user doesn't own it)
+            const projectResp = await fetch(`http://${HOST}/api/projects/${currentProjectId}/info`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const project = await projectResp.json();
+
+            if (project && project.project_name) {
+                currentProjectName = project.project_name;
+                updateProjectDisplay();
+            }
+        } else {
+            currentProjectId = null;
+            currentProjectName = null;
+            document.getElementById("project-display").innerText = "Project: (None)";
+        }
+    } catch (e) {
+        console.error("Error loading project info", e);
+    }
+}
+
+function updateProjectDisplay() {
+    if (currentProjectName) {
+        document.getElementById("project-display").innerText = "Project: " + currentProjectName;
+    } else {
+        document.getElementById("project-display").innerText = "Project: (None)";
     }
 }
 
@@ -298,10 +347,16 @@ document.getElementById("select-project-choice").onchange = (e) => {
 // --- 4. IMPORTAR Y GUARDAR PROYECTOS ---
 
 document.getElementById("btn-save").onclick = async () => {
+    const label = prompt("Version label (optional):", "");
     try {
         const resp = await fetch(`http://${HOST}/api/projects/save-current`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ room_name: room, content: codeEditor.getValue() })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ 
+                room_name: room, 
+                content: codeEditor.getValue(),
+                version_label: label || undefined
+            })
         });
         if (resp.ok) alert("Saved! ✅");
         else alert((await resp.json()).error);
@@ -315,24 +370,213 @@ document.getElementById("btn-import").onclick = async () => {
         const resp = await fetch(`http://${HOST}/api/projects`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
-        (await resp.json()).forEach(p => {
+        const projects = await resp.json();
+
+        for (const p of projects) {
             const opt = document.createElement("option");
-            opt.value = p.last_content; // Guardamos el contenido directamente en el value
+            opt.value = p.id;
             opt.innerText = p.project_name;
+            opt.dataset.projectId = p.id;
             select.appendChild(opt);
-        });
+        }
         document.getElementById("import-project-modal").style.display = "flex";
     } catch (e) { alert("Error loading projects"); }
 };
 
-document.getElementById("btn-confirm-import").onclick = () => {
-    const content = document.getElementById("select-import-project").value;
-    if (content !== undefined) {
-        codeEditor.setValue(content);
-        // El evento 'change' de CodeMirror ya se encarga de enviarlo por WebSocket
+document.getElementById("btn-confirm-import").onclick = async () => {
+    const select = document.getElementById("select-import-project");
+    const projectId = parseInt(select.value, 10);
+    if (!projectId) return;
+
+    try {
+        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const history = await resp.json();
+
+        if (history.length === 0) {
+            alert("Project has no saved versions yet");
+            return;
+        }
+
+        // Get the latest version
+        const latestVersion = history[0];
+        codeEditor.setValue(latestVersion.content_snapshot);
+
+        // Update room's actual_project_id
+        const updateResp = await fetch(`http://${HOST}/api/rooms/${room}/project`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ project_id: projectId })
+        });
+
+        if (updateResp.ok) {
+            // Update the current project variables and display
+            const projResp = await fetch(`http://${HOST}/api/projects`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const projects = await projResp.json();
+            const project = projects.find(p => p.id === projectId);
+            if (project) {
+                currentProjectId = projectId;
+                currentProjectName = project.project_name;
+                updateProjectDisplay();
+
+                // Broadcast to all users in the room
+                if (socket?.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'project-changed',
+                        projectId: projectId,
+                        projectName: project.project_name
+                    }));
+                }
+            }
+        } else {
+            console.error("Failed to link project to room");
+        }
+
         document.getElementById("import-project-modal").style.display = "none";
+    } catch (e) {
+        alert("Error loading project content");
+        console.error(e);
     }
 };
+
+// --- 6. PROJECTS MENU ---
+
+document.getElementById("btn-projects").onclick = async () => {
+    document.getElementById("projects-menu-modal").style.display = "flex";
+    await loadProjectsMenu();
+};
+
+document.getElementById("btn-close-projects-menu").onclick = () => {
+    document.getElementById("projects-menu-modal").style.display = "none";
+};
+
+async function loadProjectsMenu() {
+    try {
+        const resp = await fetch(`http://${HOST}/api/projects`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const projects = await resp.json();
+
+        const projectsList = document.getElementById("projects-list");
+        projectsList.innerHTML = "";
+
+        if (projects.length === 0) {
+            projectsList.innerHTML = '<p style="color: #888;">No projects yet</p>';
+            return;
+        }
+
+        projects.forEach(p => {
+            const btn = document.createElement("button");
+            btn.className = "tool-btn";
+            btn.style.cssText = "text-align: left; padding: 12px; border: 1px solid #555; justify-content: flex-start;";
+            btn.innerHTML = `<strong>${p.project_name}</strong><br><small style="color: #888; font-size: 0.85em;">${new Date(p.updated_at).toLocaleDateString()}</small>`;
+            btn.onclick = () => loadProjectVersions(p.id, p.project_name);
+            projectsList.appendChild(btn);
+        });
+    } catch (e) {
+        console.error("Error loading projects menu", e);
+        document.getElementById("projects-list").innerHTML = '<p style="color: red;">Error loading projects</p>';
+    }
+}
+
+async function loadProjectVersions(projectId, projectName) {
+    try {
+        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const history = await resp.json();
+
+        document.getElementById("selected-project-name").innerText = `${projectName} - Versions`;
+        document.getElementById("versions-section").style.display = "block";
+        document.getElementById("no-selection").style.display = "none";
+
+        const versionsList = document.getElementById("versions-list");
+        versionsList.innerHTML = "";
+
+        if (history.length === 0) {
+            versionsList.innerHTML = '<p style="color: #888;">No versions saved yet</p>';
+            return;
+        }
+
+        history.forEach((v, idx) => {
+            const div = document.createElement("div");
+            div.className = "tool-btn";
+            div.style.cssText = "text-align: left; padding: 12px; border: 1px solid #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center;";
+
+            const label = v.version_label || `Auto-save ${idx + 1}`;
+            const date = new Date(v.saved_at).toLocaleDateString();
+
+            div.innerHTML = `
+                <div>
+                    <strong>${label}</strong><br>
+                    <small style="color: #888;">by ${v.username} • ${date}</small>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="tool-btn success" style="padding: 6px 12px; font-size: 0.9em;" onclick="restoreVersion(${projectId}, ${v.id}, '${label.replace(/'/g, "\\'")}')">Restore</button>
+                    <button class="tool-btn secondary" style="padding: 6px 12px; font-size: 0.9em;" onclick="showVersionPreview(${v.id}, ${projectId})">Preview</button>
+                </div>
+            `;
+            versionsList.appendChild(div);
+        });
+
+        // Show preview of latest version by default
+        if (history.length > 0) {
+            showVersionPreview(history[0].id, projectId);
+        }
+    } catch (e) {
+        console.error("Error loading versions", e);
+        document.getElementById("versions-list").innerHTML = '<p style="color: red;">Error loading versions</p>';
+    }
+}
+
+async function showVersionPreview(historyId, projectId) {
+    try {
+        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        const version = await resp.json();
+        document.getElementById("version-preview").value = version.content_snapshot || "(empty)";
+    } catch (e) {
+        console.error("Error loading preview", e);
+        document.getElementById("version-preview").value = "Error loading preview";
+    }
+}
+
+async function restoreVersion(projectId, historyId, label) {
+    const confirm = window.confirm(`Restore version: "${label}"?`);
+    if (!confirm) return;
+
+    try {
+        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (resp.ok) {
+            alert("Version restored! ✅");
+
+            // If this is the current project, update the editor
+            if (projectId === currentProjectId) {
+                const histResp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const version = await histResp.json();
+                codeEditor.setValue(version.content_snapshot);
+            }
+
+            // Reload versions list
+            await loadProjectVersions(projectId, document.getElementById("selected-project-name").innerText.split(" - ")[0]);
+        } else {
+            alert("Error restoring version");
+        }
+    } catch (e) {
+        console.error("Error restoring version", e);
+        alert("Error restoring version");
+    }
+}
 
 // --- 5. FUNCIONES AUXILIARES ---
 
