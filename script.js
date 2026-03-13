@@ -5,7 +5,7 @@ let selectedAvatar = null;
 let isSignUp = false;
 let chatHistory = [];
 let dbUsers = {};
-const HOST = "localhost:3000";
+const HOST = window.location.hostname + ":3000";
 
 // --- 1. INICIALIZACIÓN SEGURA ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -261,11 +261,27 @@ async function showLobby() {
 
 function renderRooms(roomsArray) {
     const container = document.getElementById("rooms-container");
-    container.innerHTML = roomsArray.length === 0 ? "<p>No rooms found.</p>" : "";
+    container.innerHTML = "";
+
+    if (roomsArray.length === 0) {
+        const p = document.createElement("p");
+        p.textContent = "No rooms found.";
+        container.appendChild(p);
+        return;
+    }
+
     roomsArray.forEach(r => {
         const card = document.createElement("div");
         card.className = "room-card";
-        card.innerHTML = `<h4>${r.room_name}</h4><p>${r.description || ''}</p>`;
+
+        const h4 = document.createElement("h4");
+        h4.textContent = r.room_name;
+        card.appendChild(h4);
+
+        const p = document.createElement("p");
+        p.textContent = r.description || '';
+        card.appendChild(p);
+
         card.onclick = () => {
             room = r.room_name;
             localStorage.setItem("room", room);
@@ -472,13 +488,29 @@ async function loadProjectsMenu() {
             const btn = document.createElement("button");
             btn.className = "tool-btn";
             btn.style.cssText = "text-align: left; padding: 12px; border: 1px solid #555; justify-content: flex-start;";
-            btn.innerHTML = `<strong>${p.project_name}</strong><br><small style="color: #888; font-size: 0.85em;">${new Date(p.updated_at).toLocaleDateString()}</small>`;
+
+            const strong = document.createElement("strong");
+            strong.textContent = p.project_name;
+            btn.appendChild(strong);
+
+            btn.appendChild(document.createElement("br"));
+
+            const small = document.createElement("small");
+            small.style.cssText = "color: #888; font-size: 0.85em;";
+            small.textContent = new Date(p.updated_at).toLocaleDateString();
+            btn.appendChild(small);
+
             btn.onclick = () => loadProjectVersions(p.id, p.project_name);
             projectsList.appendChild(btn);
         });
     } catch (e) {
         console.error("Error loading projects menu", e);
-        document.getElementById("projects-list").innerHTML = '<p style="color: red;">Error loading projects</p>';
+        const projectsList = document.getElementById("projects-list");
+        projectsList.innerHTML = "";
+        const p = document.createElement("p");
+        p.style.color = "red";
+        p.textContent = "Error loading projects";
+        projectsList.appendChild(p);
     }
 }
 
@@ -505,31 +537,63 @@ async function loadProjectVersions(projectId, projectName) {
             const div = document.createElement("div");
             div.className = "tool-btn";
             div.style.cssText = "text-align: left; padding: 12px; border: 1px solid #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center;";
-
+            div.onclick = () => {
+                // Remove active class from all versions
+                document.querySelectorAll("#versions-list > div").forEach(d => d.classList.remove("active"));
+                // Add active class to this version
+                div.classList.add("active");
+                clickVersion(v.id, projectId);
+            };
             const label = v.version_label || `Auto-save ${idx + 1}`;
             const date = new Date(v.saved_at).toLocaleDateString();
 
-            div.innerHTML = `
-                <div>
-                    <strong>${label}</strong><br>
-                    <small style="color: #888;">by ${v.username} • ${date}</small>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button class="tool-btn success" style="padding: 6px 12px; font-size: 0.9em;" onclick="restoreVersion(${projectId}, ${v.id}, '${label.replace(/'/g, "\\'")}')">Restore</button>
-                    <button class="tool-btn secondary" style="padding: 6px 12px; font-size: 0.9em;" onclick="showVersionPreview(${v.id}, ${projectId})">Preview</button>
-                </div>
-            `;
+            // Left side: version info
+            const leftDiv = document.createElement("div");
+
+            const strong = document.createElement("strong");
+            strong.textContent = label;
+            leftDiv.appendChild(strong);
+
+            leftDiv.appendChild(document.createElement("br"));
+
+            const small = document.createElement("small");
+            small.style.color = "#888";
+            small.textContent = `by ${v.username} • ${date}`;
+            leftDiv.appendChild(small);
+
+            div.appendChild(leftDiv);
+
+            // Right side: buttons
+            const rightDiv = document.createElement("div");
+            rightDiv.style.cssText = "display: flex; gap: 8px;";
+
+            const restoreBtn = document.createElement("button");
+            restoreBtn.className = "tool-btn success";
+            restoreBtn.style.cssText = "padding: 6px 12px; font-size: 0.9em;";
+            restoreBtn.textContent = "Restore";
+            restoreBtn.onclick = () => restoreVersion(projectId, v.id, label);
+            rightDiv.appendChild(restoreBtn);
+
+            div.appendChild(rightDiv);
             versionsList.appendChild(div);
         });
 
         // Show preview of latest version by default
         if (history.length > 0) {
+            // Add active class to first version
+            const firstVersionDiv = document.querySelector("#versions-list > div");
+            if (firstVersionDiv) firstVersionDiv.classList.add("active");
             showVersionPreview(history[0].id, projectId);
         }
     } catch (e) {
         console.error("Error loading versions", e);
         document.getElementById("versions-list").innerHTML = '<p style="color: red;">Error loading versions</p>';
     }
+}
+
+async function clickVersion(historyId, projectId) {
+    await showVersionPreview(historyId, projectId);
+    document.getElementById("versions-section").scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
 async function showVersionPreview(historyId, projectId) {
@@ -539,6 +603,7 @@ async function showVersionPreview(historyId, projectId) {
         });
         const version = await resp.json();
         document.getElementById("version-preview").value = version.content_snapshot || "(empty)";
+        
     } catch (e) {
         console.error("Error loading preview", e);
         document.getElementById("version-preview").value = "Error loading preview";
@@ -558,17 +623,28 @@ async function restoreVersion(projectId, historyId, label) {
         if (resp.ok) {
             alert("Version restored! ✅");
 
-            // If this is the current project, update the editor
+            // If this is the current project, update the editor and sync to all users
             if (projectId === currentProjectId) {
                 const histResp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 const version = await histResp.json();
                 codeEditor.setValue(version.content_snapshot);
+
+                // Broadcast to all users in the room
+                if (socket?.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'code-update',
+                        content: version.content_snapshot
+                    }));
+                }
             }
 
             // Reload versions list
             await loadProjectVersions(projectId, document.getElementById("selected-project-name").innerText.split(" - ")[0]);
+
+            // Close the projects menu
+            document.getElementById("projects-menu-modal").style.display = "none";
         } else {
             alert("Error restoring version");
         }
@@ -605,17 +681,60 @@ function appendMessage(user, text, color, isOwn) {
     const log = document.getElementById("messages-log");
     const div = document.createElement("div");
     div.className = `message-row ${user === myUsername || isOwn ? 'own-message' : 'other-message'}`;
-    div.innerHTML = `<div class="bubble"><strong style="color:${color}">${user}</strong><br>${text}</div>`;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+
+    const username = document.createElement("strong");
+    username.style.color = color;
+    username.textContent = user;
+    bubble.appendChild(username);
+
+    bubble.appendChild(document.createElement("br"));
+
+    const textNode = document.createTextNode(text);
+    bubble.appendChild(textNode);
+
+    div.appendChild(bubble);
     log.appendChild(div);
     log.scrollTop = log.scrollHeight;
 }
 
 function updateUserList() {
     const list = document.getElementById("users-list");
-    list.innerHTML = `<li class="user-item"><img src="${myAvatar}" class="avatar"><span>${myUsername} (You)</span></li>`;
+    list.innerHTML = "";
+
+    // Add current user
+    const li = document.createElement("li");
+    li.className = "user-item";
+
+    const img = document.createElement("img");
+    img.src = myAvatar;
+    img.className = "avatar";
+    li.appendChild(img);
+
+    const span = document.createElement("span");
+    span.textContent = `${myUsername} (You)`;
+    li.appendChild(span);
+
+    list.appendChild(li);
+
+    // Add other users
     for (let id in dbUsers) {
         const u = dbUsers[id];
-        list.innerHTML += `<li class="user-item"><img src="${u.avatar}" class="avatar"><span>${u.username}</span></li>`;
+        const li = document.createElement("li");
+        li.className = "user-item";
+
+        const img = document.createElement("img");
+        img.src = u.avatar;
+        img.className = "avatar";
+        li.appendChild(img);
+
+        const span = document.createElement("span");
+        span.textContent = u.username;
+        li.appendChild(span);
+
+        list.appendChild(li);
     }
 }
 

@@ -276,7 +276,7 @@ html, body {
 /* UI ELEMENTS */
 #lang-indicator {
     background: #3776ab;
-    color: #ffde57;
+    color: #000000;
     padding: 4px 10px;
     border-radius: 4px;
     font-size: 12px;
@@ -435,6 +435,8 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .room-card:hover {
@@ -727,6 +729,11 @@ html, body {
 }
 
 #versions-list > div:hover {
+    background: #36393f !important;
+    border-color: #5865F2 !important;
+}
+
+#versions-list > div.active {
     background: #36393f !important;
     border-color: #5865F2 !important;
 }
