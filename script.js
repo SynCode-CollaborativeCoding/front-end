@@ -133,6 +133,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-cancel-import").onclick = () => {
         document.getElementById("import-project-modal").style.display = "none";
     };
+
+    // G. Download button
+    document.getElementById("btn-download").onclick = downloadCode;
 });
 
 // --- 2. AUTENTICACIÓN Y WEBSOCKET ---
@@ -800,6 +803,22 @@ function toggleSidebar() { document.getElementById("main-layout").classList.togg
 function toggleChat() { document.getElementById("chat-collapsible").classList.toggle("chat-hidden"); }
 function logout() { localStorage.clear(); location.reload(); }
 function changeRoom() { localStorage.removeItem("room"); location.reload(); }
+function downloadCode() {
+    const code = codeEditor.getValue();
+    const lang = codeEditor.getOption("mode");
+    const ext = lang === "python" ? "py" : "js";
+    const filename = currentProjectName ? `${currentProjectName}.${ext}` : `code.${ext}`;
+
+    const blob = new Blob([code], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
 function getUsernameColor(u) {
     let hash = 0;
     for (let i = 0; i < u.length; i++) hash = u.charCodeAt(i) + ((hash << 5) - hash);
