@@ -842,3 +842,19 @@ html, body {
     scrollbar-width: thin;
     scrollbar-color: #555 #2c2c2c;
 }
+
+/* --- REMOTE CURSORS & SELECTION STYLES --- */
+
+.CodeMirror-cursor {
+    border-left: 2px solid #5865F2;
+}
+
+.remote-cursor-label {
+    position: relative;
+    display: inline-block;
+    margin-right: 2px;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Selection marker styling handled inline with dynamic color */

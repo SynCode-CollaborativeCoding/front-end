@@ -5,6 +5,8 @@ let selectedAvatar = null;
 let isSignUp = false;
 let chatHistory = [];
 let dbUsers = {};
+let remoteCursors = {}; // { userId: { username, cursor, selection, marker, widget } }
+let lastCursorUpdate = 0; // Throttle control
 const HOST = window.location.hostname + ":3000";
 
 // --- 1. INICIALIZACIÓN SEGURA ---
@@ -36,6 +38,43 @@ document.addEventListener("DOMContentLoaded", () => {
         codeEditor.on("change", (instance, change) => {
             if (change.origin !== "setValue" && socket?.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ type: 'code-update', content: instance.getValue() }));
+            }
+        });
+
+        // Cursor activity tracking with throttle (50ms)
+        codeEditor.on("cursorActivity", (instance) => {
+            const now = Date.now();
+            if (now - lastCursorUpdate < 50) return; // Throttle
+            lastCursorUpdate = now;
+
+            const cursor = instance.getCursor();
+            let selection = null;
+
+            if (instance.somethingSelected()) {
+                const selections = instance.listSelections();
+                if (selections.length > 0) {
+                    const sel = selections[0];
+
+                    // Use anchor and head (CodeMirror 5 standard)
+                    const from = sel.anchor.line < sel.head.line ||
+                                 (sel.anchor.line === sel.head.line && sel.anchor.ch < sel.head.ch)
+                                 ? sel.anchor : sel.head;
+                    const to = from === sel.anchor ? sel.head : sel.anchor;
+
+                    selection = [
+                        { line: from.line, ch: from.ch },
+                        { line: to.line, ch: to.ch }
+                    ];
+                }
+            }
+
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'cursor-update',
+                    userId: myId,
+                    cursor: cursor,
+                    selection: selection
+                }));
             }
         });
     }
@@ -187,6 +226,12 @@ function handleSocketMessage(event) {
                 const cur = codeEditor.getCursor();
                 codeEditor.setValue(data.content);
                 codeEditor.setCursor(cur);
+                clearAllRemoteCursors(); // Clear cursors when code changes
+            }
+            break;
+        case 'cursor-update':
+            if (data.userId !== myId) {
+                updateRemoteCursor(data.userId, data.cursor, data.selection);
             }
             break;
         case 'chat':
@@ -196,10 +241,14 @@ function handleSocketMessage(event) {
         case 'project-changed':
             currentProjectId = data.projectId;
             currentProjectName = data.projectName;
+            if (data.content !== undefined) {
+                codeEditor.setValue(data.content);
+            }
             updateProjectDisplay();
             break;
         case 'user-disconnected':
             delete dbUsers[data.id];
+            clearRemoteCursor(data.id); // Clean up remote cursor
             updateUserList();
             break;
     }
@@ -443,7 +492,8 @@ document.getElementById("btn-confirm-import").onclick = async () => {
                     socket.send(JSON.stringify({
                         type: 'project-changed',
                         projectId: projectId,
-                        projectName: project.project_name
+                        projectName: project.project_name,
+                        content: codeEditor.getValue()
                     }));
                 }
             }
@@ -754,4 +804,118 @@ function getUsernameColor(u) {
     let hash = 0;
     for (let i = 0; i < u.length; i++) hash = u.charCodeAt(i) + ((hash << 5) - hash);
     return `hsl(${Math.abs(hash % 360)}, 70%, 60%)`;
+}
+
+// --- REMOTE CURSORS & SELECTION RENDERING ---
+
+function updateRemoteCursor(userId, cursor, selection) {
+    if (!cursor) return;
+
+    // Validate cursor position within document bounds
+    const lineCount = codeEditor.lineCount();
+    if (cursor.line < 0 || cursor.line >= lineCount) return;
+
+    const username = dbUsers[userId]?.username || `User ${userId}`;
+    renderRemoteCursor(userId, username, cursor, selection);
+}
+
+function renderRemoteCursor(userId, username, cursor, selection) {
+    // Clear old cursors for this user
+    if (remoteCursors[userId]) {
+        if (remoteCursors[userId].marker) remoteCursors[userId].marker.clear();
+        if (remoteCursors[userId].widget) remoteCursors[userId].widget.clear();
+        // Remove injected style
+        const style = document.getElementById(`remote-cursor-style-${userId}`);
+        if (style) style.remove();
+    }
+
+    const color = getUsernameColor(username);
+    let marker = null;
+
+    // Render selection as a text marker
+    if (selection && selection.length === 2) {
+        const from = selection[0];
+        const to = selection[1];
+
+        // Validate selection positions
+        const lineCount = codeEditor.lineCount();
+        if (from && to &&
+            from.line >= 0 && from.line < lineCount &&
+            to.line >= 0 && to.line < lineCount &&
+            from.ch !== undefined && to.ch !== undefined) {
+
+            // Create a unique CSS class for this user's selection
+            const className = `remote-selection-${userId}`;
+
+            // Use a contrasting pink background for better visibility with any text color
+            const bgColor = `rgba(255, 100, 200, 0.3)`;
+
+            // Inject CSS style - no opacity, just a light background color
+            const style = document.createElement('style');
+            style.id = `remote-cursor-style-${userId}`;
+            style.textContent = `.${className} { background-color: ${bgColor} !important; }`;
+            document.head.appendChild(style);
+
+            marker = codeEditor.markText(
+                from,
+                to,
+                {
+                    className: className,
+                    inclusiveRight: false
+                }
+            );
+        }
+    }
+
+    // Render cursor widget (username label)
+    const widgetElement = document.createElement('span');
+    widgetElement.className = 'remote-cursor-label';
+    widgetElement.textContent = username;
+    widgetElement.style.backgroundColor = color;
+    widgetElement.style.color = '#000';
+    widgetElement.style.padding = '1px 4px';
+    widgetElement.style.borderRadius = '3px';
+    widgetElement.style.fontSize = '10px';
+    widgetElement.style.fontWeight = 'bold';
+    widgetElement.style.whiteSpace = 'nowrap';
+    widgetElement.style.display = 'inline-block';
+    widgetElement.style.position = 'absolute';
+    widgetElement.style.margin = '0';
+    widgetElement.style.pointerEvents = 'none';
+
+    const bookmark = codeEditor.setBookmark(
+        { line: cursor.line, ch: cursor.ch },
+        { widget: widgetElement, insertLeft: true }
+    );
+
+    // Store references
+    remoteCursors[userId] = {
+        username: username,
+        cursor: cursor,
+        selection: selection,
+        marker: marker,
+        widget: bookmark
+    };
+}
+
+function clearRemoteCursor(userId) {
+    if (remoteCursors[userId]) {
+        if (remoteCursors[userId].marker) {
+            remoteCursors[userId].marker.clear();
+        }
+        if (remoteCursors[userId].widget) {
+            remoteCursors[userId].widget.clear();
+        }
+        // Remove injected style
+        const style = document.getElementById(`remote-cursor-style-${userId}`);
+        if (style) style.remove();
+
+        delete remoteCursors[userId];
+    }
+}
+
+function clearAllRemoteCursors() {
+    for (let userId in remoteCursors) {
+        clearRemoteCursor(userId);
+    }
 }
