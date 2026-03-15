@@ -108,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("switch-text").innerHTML = 'Already have an account? <a href="#" id="link-switch">Log In</a>';
                 avatarGrid.style.display = "grid";
             } else {
-                title.innerText = "Join SynCode Room";
+                title.innerText = "Enter SynCode";
                 btnConnect.innerText = "Connect & Sync";
                 document.getElementById("switch-text").innerHTML = 'Don\'t have an account? <a href="#" id="link-switch">Sign Up</a>';
                 avatarGrid.style.display = "none";

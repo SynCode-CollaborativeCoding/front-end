@@ -168,7 +168,7 @@ html, body {
 }
 
 .chat-header {
-    padding: 10px 15px;
+    padding: 11px 15px;
     background: #1e1e1e;
     display: flex;
     justify-content: space-between;
@@ -292,6 +292,15 @@ html, body {
     cursor: pointer;
     padding: 2px 8px;
     border-radius: 4px;
+}
+
+/* Ocultar botón de mostrar sidebar cuando el sidebar está visible */
+.show-sidebar-btn {
+    display: none;
+}
+
+.sidebar-hidden .show-sidebar-btn {
+    display: inline-block;
 }
 
 .tool-btn {
