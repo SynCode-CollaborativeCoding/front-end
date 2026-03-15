@@ -7,6 +7,7 @@ let chatHistory = [];
 let dbUsers = {};
 let remoteCursors = {}; // { userId: { username, cursor, selection, marker, widget } }
 let lastCursorUpdate = 0; // Throttle control
+let contentLoaded = false; // Track if content has been loaded
 const HOST = window.location.hostname + ":3000";
 
 // --- 1. INICIALIZACIÓN SEGURA ---
@@ -201,18 +202,22 @@ function connectWebSocket() {
         // Load current project info
         await loadProjectInfo();
 
-        // P2P: Cargar proyecto si la sala está vacía
+        // Fallback: if no code arrives after 1s, load from endpoint
         setTimeout(async () => {
-            if (Object.keys(dbUsers).length === 0) {
+            if (!contentLoaded) {
                 try {
                     const resp = await secureFetch(`http://${HOST}/api/rooms/${room}/content`, {
                         headers: { 'Authorization': `Bearer ${authToken}` }
                     });
                     const data = await resp.json();
-                    if (data.content) codeEditor.setValue(data.content);
+                    if (data.content && !contentLoaded) {
+                        codeEditor.setValue(data.content);
+                        contentLoaded = true;
+                    }
                 } catch (e) { console.error("Error loading project content", e); }
             }
-        }, 500);
+        }, 1000);
+
         setTimeout(() => codeEditor.refresh(), 100);
     };
 
@@ -222,6 +227,7 @@ function connectWebSocket() {
             localStorage.removeItem("room");
             alert("Room does not exist.");
         };
+        contentLoaded = false;
         location.reload();
     };
 }
@@ -229,7 +235,30 @@ function connectWebSocket() {
 function handleSocketMessage(event) {
     const data = JSON.parse(event.data);
     switch (data.type) {
-        case 'set-id': myId = data.id; break;
+        case 'set-id':
+            myId = data.id;
+            break;
+        case 'existing-users':
+            if (data.users && Array.isArray(data.users)) {
+                data.users.forEach(user => {
+                    if (user.id !== myId) {
+                        dbUsers[user.id] = { username: user.username, avatar: user.avatar };
+                    }
+                });
+                updateUserList();
+
+                // Request code from the oldest user immediately
+                const oldestUser = data.users.reduce((oldest, current) =>
+                    current.id < oldest.id ? current : oldest
+                );
+                if (oldestUser && socket?.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'code-request',
+                        targetId: oldestUser.id
+                    }));
+                }
+            }
+            break;
         case 'user-connected':
             if (data.id !== myId) {
                 dbUsers[data.id] = { username: data.username, avatar: data.avatar };
@@ -243,8 +272,39 @@ function handleSocketMessage(event) {
                 updateUserList();
             }
             break;
+        case 'code-response':
+            codeEditor.setValue(data.code);
+            contentLoaded = true;
+            if (data.chat) {
+                data.chat.forEach(m => appendMessage(m.user, m.text, getUsernameColor(m.user), false));
+                chatHistory = data.chat;
+            }
+            if (data.users) {
+                const filteredUsers = Object.keys(data.users).reduce((acc, userId) => {
+                    if (parseInt(userId) !== myId) {
+                        acc[userId] = data.users[userId];
+                    }
+                    return acc;
+                }, {});
+                dbUsers = { ...dbUsers, ...filteredUsers };
+                updateUserList();
+            }
+            break;
+        case 'send-code-request':
+            // Another user is requesting my code
+            if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'code-response',
+                    targetId: data.targetId,
+                    code: codeEditor.getValue(),
+                    chat: chatHistory,
+                    users: { [myId]: { username: myUsername, avatar: myAvatar }, ...dbUsers }
+                }));
+            }
+            break;
         case 'history-sync':
             codeEditor.setValue(data.code);
+            contentLoaded = true;
             data.chat.forEach(m => appendMessage(m.user, m.text, getUsernameColor(m.user), false));
             chatHistory = data.chat;
             // Filtrar para que no incluya al usuario actual
@@ -743,8 +803,12 @@ async function restoreVersion(projectId, historyId, label) {
 // --- 5. FUNCIONES AUXILIARES ---
 
 function checkAndSendHistory(newId) {
+    // Only the oldest user (lowest ID) in the room sends
     const ids = Object.keys(dbUsers).map(Number);
-    if (ids.every(id => id >= myId) && socket?.readyState === 1) {
+    const allIds = [myId, ...ids];
+    const minId = Math.min(...allIds);
+
+    if (myId === minId && socket?.readyState === 1) {
         socket.send(JSON.stringify({
             type: 'history-sync', targetId: newId,
             code: codeEditor.getValue(), chat: chatHistory,
