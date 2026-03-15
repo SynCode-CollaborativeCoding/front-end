@@ -140,6 +140,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // --- 2. AUTENTICACIÓN Y WEBSOCKET ---
 
+function handleExpiredToken() {
+    alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("myUsername");
+    localStorage.removeItem("myAvatar");
+    localStorage.removeItem("room");
+    location.reload();
+}
+
+async function secureFetch(url, options = {}) {
+    const response = await fetch(url, options);
+    if (response.status === 403) {
+        handleExpiredToken();
+        throw new Error("Token expired");
+    }
+    return response;
+}
+
 async function handleAuth() {
     const userIn = document.getElementById("username-input").value;
     const passIn = document.getElementById("password-input").value;
@@ -187,7 +205,7 @@ function connectWebSocket() {
         setTimeout(async () => {
             if (Object.keys(dbUsers).length === 0) {
                 try {
-                    const resp = await fetch(`http://${HOST}/api/rooms/${room}/content`, {
+                    const resp = await secureFetch(`http://${HOST}/api/rooms/${room}/content`, {
                         headers: { 'Authorization': `Bearer ${authToken}` }
                     });
                     const data = await resp.json();
@@ -212,16 +230,31 @@ function handleSocketMessage(event) {
     const data = JSON.parse(event.data);
     switch (data.type) {
         case 'set-id': myId = data.id; break;
-        case 'user-connected': checkAndSendHistory(data.id); break;
+        case 'user-connected':
+            if (data.id !== myId) {
+                dbUsers[data.id] = { username: data.username, avatar: data.avatar };
+                updateUserList();
+            }
+            checkAndSendHistory(data.id);
+            break;
         case 'login':
-            dbUsers[data.authorId] = { username: data.username, avatar: data.avatar };
-            updateUserList();
+            if (data.authorId !== myId) {
+                dbUsers[data.authorId] = { username: data.username, avatar: data.avatar };
+                updateUserList();
+            }
             break;
         case 'history-sync':
             codeEditor.setValue(data.code);
             data.chat.forEach(m => appendMessage(m.user, m.text, getUsernameColor(m.user), false));
             chatHistory = data.chat;
-            dbUsers = { ...dbUsers, ...data.users };
+            // Filtrar para que no incluya al usuario actual
+            const filteredUsers = Object.keys(data.users).reduce((acc, userId) => {
+                if (parseInt(userId) !== myId) {
+                    acc[userId] = data.users[userId];
+                }
+                return acc;
+            }, {});
+            dbUsers = { ...dbUsers, ...filteredUsers };
             updateUserList();
             break;
         case 'code-update':
@@ -260,7 +293,7 @@ function handleSocketMessage(event) {
 async function loadProjectInfo() {
     try {
         // Fetch all rooms to find the current one
-        const roomsResp = await fetch(`http://${HOST}/api/rooms`, {
+        const roomsResp = await secureFetch(`http://${HOST}/api/rooms`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const rooms = await roomsResp.json();
@@ -270,7 +303,7 @@ async function loadProjectInfo() {
             currentProjectId = currentRoom.actual_project_id;
 
             // Fetch the project info (works even if user doesn't own it)
-            const projectResp = await fetch(`http://${HOST}/api/projects/${currentProjectId}/info`, {
+            const projectResp = await secureFetch(`http://${HOST}/api/projects/${currentProjectId}/info`, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
             });
             const project = await projectResp.json();
@@ -304,7 +337,7 @@ async function showLobby() {
     document.getElementById("chat-app").style.display = "none";
     document.getElementById("lobby-screen").style.display = "flex";
     try {
-        const resp = await fetch(`http://${HOST}/api/rooms`, {
+        const resp = await secureFetch(`http://${HOST}/api/rooms`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         renderRooms(await resp.json());
@@ -347,7 +380,7 @@ document.getElementById("btn-open-create-room").onclick = async () => {
     const select = document.getElementById("select-project-choice");
     select.innerHTML = '<option value="new">-- Create New Empty Project --</option>';
     try {
-        const resp = await fetch(`http://${HOST}/api/projects`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const projects = await resp.json();
@@ -374,8 +407,8 @@ document.getElementById("btn-create-room-save").onclick = async () => {
         // A. Si elige crear un proyecto nuevo
         if (projectChoice === "new") {
             if (!newProjectName) return alert("Please name your new project");
-            
-            const projResp = await fetch(`http://${HOST}/api/projects`, {
+
+            const projResp = await secureFetch(`http://${HOST}/api/projects`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
                 body: JSON.stringify({ project_name: newProjectName })
@@ -385,13 +418,13 @@ document.getElementById("btn-create-room-save").onclick = async () => {
         }
 
         // B. Crear la sala vinculada al proyecto (nuevo o existente)
-        const roomResp = await fetch(`http://${HOST}/api/rooms`, {
+        const roomResp = await secureFetch(`http://${HOST}/api/rooms`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ 
-                room_name: roomName, 
-                description: roomDesc, 
-                actual_project_id: finalProjectId 
+            body: JSON.stringify({
+                room_name: roomName,
+                description: roomDesc,
+                actual_project_id: finalProjectId
             })
         });
 
@@ -417,11 +450,11 @@ document.getElementById("select-project-choice").onchange = (e) => {
 document.getElementById("btn-save").onclick = async () => {
     const label = prompt("Version label (optional):", "");
     try {
-        const resp = await fetch(`http://${HOST}/api/projects/save-current`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects/save-current`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-            body: JSON.stringify({ 
-                room_name: room, 
+            body: JSON.stringify({
+                room_name: room,
                 content: codeEditor.getValue(),
                 version_label: label || undefined
             })
@@ -435,7 +468,7 @@ document.getElementById("btn-import").onclick = async () => {
     const select = document.getElementById("select-import-project");
     select.innerHTML = '<option value="">-- Select Project --</option>';
     try {
-        const resp = await fetch(`http://${HOST}/api/projects`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const projects = await resp.json();
@@ -457,7 +490,7 @@ document.getElementById("btn-confirm-import").onclick = async () => {
     if (!projectId) return;
 
     try {
-        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects/${projectId}/history`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const history = await resp.json();
@@ -472,7 +505,7 @@ document.getElementById("btn-confirm-import").onclick = async () => {
         codeEditor.setValue(latestVersion.content_snapshot);
 
         // Update room's actual_project_id
-        const updateResp = await fetch(`http://${HOST}/api/rooms/${room}/project`, {
+        const updateResp = await secureFetch(`http://${HOST}/api/rooms/${room}/project`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify({ project_id: projectId })
@@ -480,7 +513,7 @@ document.getElementById("btn-confirm-import").onclick = async () => {
 
         if (updateResp.ok) {
             // Update the current project variables and display
-            const projResp = await fetch(`http://${HOST}/api/projects`, {
+            const projResp = await secureFetch(`http://${HOST}/api/projects`, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
             });
             const projects = await projResp.json();
@@ -524,7 +557,7 @@ document.getElementById("btn-close-projects-menu").onclick = () => {
 
 async function loadProjectsMenu() {
     try {
-        const resp = await fetch(`http://${HOST}/api/projects`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const projects = await resp.json();
@@ -569,7 +602,7 @@ async function loadProjectsMenu() {
 
 async function loadProjectVersions(projectId, projectName) {
     try {
-        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects/${projectId}/history`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const history = await resp.json();
@@ -651,12 +684,12 @@ async function clickVersion(historyId, projectId) {
 
 async function showVersionPreview(historyId, projectId) {
     try {
-        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
         const version = await resp.json();
         document.getElementById("version-preview").value = version.content_snapshot || "(empty)";
-        
+
     } catch (e) {
         console.error("Error loading preview", e);
         document.getElementById("version-preview").value = "Error loading preview";
@@ -668,7 +701,7 @@ async function restoreVersion(projectId, historyId, label) {
     if (!confirm) return;
 
     try {
-        const resp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}/restore`, {
+        const resp = await secureFetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}/restore`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
         });
@@ -678,7 +711,7 @@ async function restoreVersion(projectId, historyId, label) {
 
             // If this is the current project, update the editor and sync to all users
             if (projectId === currentProjectId) {
-                const histResp = await fetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
+                const histResp = await secureFetch(`http://${HOST}/api/projects/${projectId}/history/${historyId}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 const version = await histResp.json();
