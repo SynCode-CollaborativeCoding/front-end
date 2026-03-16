@@ -2,6 +2,24 @@
 
 Esta es la interfaz de usuario para la plataforma **SynCode**, desarrollada con tecnologías web estándar para garantizar ligereza y compatibilidad.
 
+## Cómo funciona
+
+El frontend es una **SPA (single-page application) estática** sin frameworks ni compilación. Toda la lógica reside en tres archivos (`index.html`, `script.js`, `style.css`) y se apoya en **CodeMirror 5** como editor de código.
+
+Al cargarse, la app lee `localStorage` para detectar si hay una sesión activa (token JWT + sala) y redirige automáticamente al lobby o a la sala correspondiente. En caso contrario, muestra la pantalla de login/registro.
+
+La navegación entre pantallas (login → lobby → sala) se gestiona ocultando y mostrando `div`s con `style.display`.
+
+Una vez dentro de una sala, la app abre una conexión **WebSocket** (`ws://HOST:3000/room/{sala}?token=JWT`) para sincronizar en tiempo real:
+
+- **Código**: cualquier cambio en el editor se transmite al instante a todos los participantes.
+- **Cursores y selecciones**: la posición del cursor de cada usuario se dibuja directamente en el editor con su nombre.
+- **Chat**: mensajes en tiempo real con historial sincronizado al entrar.
+
+La sincronización inicial del contenido al unirse a una sala se realiza solicitando el estado al usuario más antiguo conectado o con un fallback a `GET /api/rooms/{sala}/content` si no hay respuesta.
+
+La gestión de proyectos y versiones (guardar, listar, previsualizar y restaurar versiones) se realiza mediante llamadas REST estándar al backend, autenticadas con el token JWT.
+
 ## Estructura de archivos
 
 - **`index.html`**: Estructura principal de la aplicación.
